@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GOAT Harness</title>
+  <script src="/preload.js"></script>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="title-wrap">
+        <span class="logo-dot" aria-hidden="true"></span>
+        <div>
+          <h1>GOAT Harness</h1>
+          <p class="subtitle">ChatGPT Subscription + Claude Code Harness</p>
+        </div>
+      </div>
+      <div class="badges">
+        <span id="badge-openai" class="pill pill-muted">OpenAI: Checking</span>
+        <span id="badge-claude" class="pill pill-muted">Claude CLI: Checking</span>
+      </div>
+    </header>
+
+    <section class="card" id="auth-card">
+      <div class="card-head">
+        <h2>OpenAI Subscription</h2>
+        <button id="btn-toggle-advanced" type="button" class="link-btn">Advanced / API Key</button>
+      </div>
+
+      <div id="auth-disconnected" class="stack">
+        <p class="hint">
+          Connect your ChatGPT Plus / Pro / Business subscription via OpenAI's official Sign in with ChatGPT flow.
+        </p>
+        <div class="row">
+          <button id="btn-signin" type="button" class="btn btn-primary">Sign in with ChatGPT</button>
+          <button id="btn-cancel-oauth" type="button" class="btn btn-ghost hidden">Cancel</button>
+        </div>
+        <div id="oauth-pending-box" class="notice hidden">
+          <div>Waiting for browser authorization…</div>
+          <a id="oauth-link" href="#" target="_blank" rel="noopener noreferrer">Open Sign-In URL</a>
+        </div>
+      </div>
+
+      <div id="auth-connected" class="stack hidden">
+        <div class="account-row">
+          <div>
+            <div id="account-identity" class="strong">Connected</div>
+            <div id="account-meta" class="muted">OAuth plan session</div>
+          </div>
+          <div class="row">
+            <button id="btn-refresh-models" type="button" class="btn btn-ghost sm">Refresh Models</button>
+            <button id="btn-signout" type="button" class="btn btn-danger sm">Sign Out</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="advanced-panel" class="advanced hidden">
+        <label class="field">
+          <span>Optional API Key Fallback (leaves OAuth intact if blank)</span>
+          <input id="input-apikey" type="password" placeholder="sk-..." autocomplete="off" />
+        </label>
+        <div class="grid-2">
+          <label class="field">
+            <span>Claude Binary Override</span>
+            <input id="input-claudepath" type="text" placeholder="Auto (/opt/homebrew/bin/claude)" />
+          </label>
+          <label class="field">
+            <span>Reasoning Effort</span>
+            <select id="select-effort">
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+              <option value="max">max</option>
+              <option value="ultra">ultra</option>
+            </select>
+          </label>
+        </div>
+        <div class="row-between">
+          <label class="checkbox-label">
+            <input id="chk-strict-verify" type="checkbox" checked />
+            <span>Enable Antigravity Stop Verification Gate</span>
+          </label>
+          <button id="btn-save-advanced" type="button" class="btn btn-ghost sm">Save Settings</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Harness Runner</h2>
+        <span id="model-status" class="muted"></span>
+      </div>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>OpenAI Model</span>
+          <select id="select-model">
+            <option value="">Sign in to load models…</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Permission Mode</span>
+          <select id="select-perm">
+            <option value="acceptEdits">acceptEdits (Edit + Safe)</option>
+            <option value="plan">plan (Read-only Review)</option>
+            <option value="dontAsk">dontAsk (Allowlisted only)</option>
+            <option value="bypassPermissions">bypassPermissions</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Workspace Directory</span>
+          <input id="input-cwd" type="text" placeholder="/path/to/workspace" />
+        </label>
+        <label class="field">
+          <span>Resume Claude Session (Optional)</span>
+          <div class="inline-input">
+            <input id="input-resume" type="text" placeholder="session_id" />
+            <button id="btn-resume-last" type="button" class="btn btn-ghost sm" title="Fill last session id">Last</button>
+          </div>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Prompt for Claude Code Harness (powered by ChatGPT model)</span>
+        <textarea id="input-prompt" rows="4" placeholder="e.g., Inspect auth flow in src/, identify edge cases, fix them, and run npm test"></textarea>
+      </label>
+
+      <div class="row-between">
+        <div class="row">
+          <button id="btn-run" type="button" class="btn btn-primary">Run Harness</button>
+          <button id="btn-stop" type="button" class="btn btn-danger hidden">Stop</button>
+        </div>
+        <button id="btn-send-agy" type="button" class="btn btn-ghost sm hidden">Send Result to Antigravity</button>
+      </div>
+    </section>
+
+    <section class="card" id="usage-card">
+      <div class="card-head">
+        <h2>Token Usage &amp; Quota</h2>
+        <div class="row">
+          <a id="link-chatgpt-quota" class="link-btn" href="https://chatgpt.com/#settings" target="_blank" rel="noopener noreferrer">ChatGPT Settings</a>
+          <button id="btn-reset-usage" type="button" class="link-btn">Reset</button>
+        </div>
+      </div>
+      <div class="usage-grid">
+        <div class="stat-box">
+          <div class="stat-label">Today</div>
+          <div id="usage-today-tokens" class="stat-value">0</div>
+          <div id="usage-today-reqs" class="stat-sub">0 reqs</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Last 7 Days</div>
+          <div id="usage-7d-tokens" class="stat-value">0</div>
+          <div id="usage-7d-reqs" class="stat-sub">0 reqs</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Last 30 Days</div>
+          <div id="usage-30d-tokens" class="stat-value">0</div>
+          <div id="usage-30d-reqs" class="stat-sub">0 reqs</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">All Time</div>
+          <div id="usage-all-tokens" class="stat-value">0</div>
+          <div id="usage-all-reqs" class="stat-sub">0 reqs</div>
+        </div>
+      </div>
+      <div id="usage-models" class="usage-models">
+        <div class="muted">No local proxy requests recorded yet.</div>
+      </div>
+      <div id="usage-quota-alert" class="quota-alert hidden"></div>
+      <p id="usage-note" class="hint">
+        Local token counts are exact for GOAT Harness requests. Server-side ChatGPT weekly caps are managed in ChatGPT Settings.
+      </p>
+    </section>
+
+    <section class="card" id="active-run-card">
+      <div class="card-head">
+        <h2>Run Output</h2>
+        <span id="run-meta" class="muted">No run selected</span>
+      </div>
+      <div id="run-tools" class="tools-strip hidden"></div>
+      <pre id="run-output" class="output-box">Ready. Sign in with ChatGPT, pick a model, and launch a task — or let Antigravity's Gemini agent delegate via MCP.</pre>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Recent Runs (Sidecar + MCP)</h2>
+        <button id="btn-refresh-state" type="button" class="link-btn">Refresh</button>
+      </div>
+      <div id="runs-list" class="runs-list">
+        <div class="muted">No runs recorded yet.</div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

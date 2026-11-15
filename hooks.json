@@ -1,0 +1,48 @@
+{
+  "goat-harness-session": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node ./scripts/hook-session.mjs",
+        "timeout": 5
+      }
+    ]
+  },
+  "goat-harness-command-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./scripts/hook-pretool.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "goat-harness-verify-tracker": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./scripts/hook-posttool.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "goat-harness-verify-gate": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ./scripts/hook-stop.mjs",
+        "timeout": 10
+      }
+    ]
+  }
+}

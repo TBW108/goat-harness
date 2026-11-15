@@ -1,0 +1,12 @@
+{
+  "name": "goat-harness",
+  "displayName": "GOAT Harness",
+  "version": "0.1.0",
+  "description": "Keep Gemini in Antigravity while adding ChatGPT subscription access (Sign in with ChatGPT), a Claude Code harness Sidecar UI & MCP bridge, and verification hooks.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Check GOAT Harness status and OpenAI subscription connection",
+    "Review my recent code changes using Claude Code harness and ChatGPT",
+    "Run a disciplined plan-implement-verify loop with GOAT Harness"
+  ]
+}

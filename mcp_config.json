@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "goat-harness-claude": {
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/lib/mcp-server.mjs"],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

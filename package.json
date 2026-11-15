@@ -1,0 +1,27 @@
+{
+  "name": "goat-harness",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Deep integration connecting OpenAI ChatGPT subscriptions (Sign in with ChatGPT) with Claude Code via a local Anthropic-to-OpenAI translation proxy.",
+  "bin": {
+    "goat-login": "./bin/goat-login.mjs",
+    "goat-claude": "./bin/goat-claude.mjs",
+    "goat-proxy": "./bin/goat-proxy.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "mcp": "node lib/mcp-server.mjs",
+    "sidecar": "node sidecars/goat_harness_ui/main.mjs",
+    "login": "node bin/goat-login.mjs login",
+    "models": "node bin/goat-login.mjs models",
+    "usage": "node bin/goat-login.mjs usage",
+    "claude": "node bin/goat-claude.mjs",
+    "status": "node bin/goat-claude.mjs status",
+    "install:claude": "bash scripts/install-claude.sh",
+    "uninstall:claude": "bash scripts/uninstall-claude.sh"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT"
+}

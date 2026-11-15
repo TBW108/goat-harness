@@ -1,0 +1,11 @@
+{
+  "name": "goat-harness",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Sign in with your OpenAI ChatGPT subscription inside Claude Code and list/select ChatGPT models.",
+  "author": {
+    "name": "goat-harness"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}
