@@ -319,6 +319,29 @@ test('CLI supports usage reporting, gpt-6-astra tiers, xhigh/ultra effort, and g
     assert.equal(launchEnv.ANTHROPIC_DEFAULT_OPUS_MODEL, 'gpt-6-astra');
     assert.equal(launchEnv.ANTHROPIC_DEFAULT_SONNET_MODEL, 'gpt-6.1-sol');
     assert.equal(launchEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL, 'gpt-6-luna');
+
+    // Verify `goat-claude usage` subcommand (without `--`) and `goat-claude top --once --json`
+    await recordUsageEvent({ model: 'gpt-6.1-sol', inputTokens: 1200, cachedTokens: 300, outputTokens: 200 });
+    const outBareUsage = makeMemoryStream();
+    const bareUsageCode = await runGoatClaude(['usage', '--json'], {
+      stdout: outBareUsage,
+      stderr: makeMemoryStream(),
+    });
+    assert.equal(bareUsageCode, 0);
+    assert.equal(JSON.parse(outBareUsage.read()).allTime.totalTokens, 1400);
+
+    let monitorCalled = null;
+    const topCode = await runGoatClaude(['top', '--once', '--json'], {
+      stdout: makeMemoryStream(),
+      stderr: makeMemoryStream(),
+      runProxyMonitor: async (opts) => {
+        monitorCalled = opts;
+        return 0;
+      },
+    });
+    assert.equal(topCode, 0);
+    assert.equal(monitorCalled.once, true);
+    assert.equal(monitorCalled.json, true);
   } finally {
     delete process.env.GOAT_HARNESS_HOME;
     rmSync(dir, { recursive: true, force: true });

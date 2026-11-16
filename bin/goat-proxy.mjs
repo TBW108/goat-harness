@@ -6,17 +6,19 @@ import {
   serveProxyForeground,
   stopAndRemoveDaemon,
 } from '../lib/proxy-daemon.mjs';
+import { runProxyMonitor } from '../lib/proxy-monitor.mjs';
 import { isMainModule } from '../lib/store.mjs';
 
 const USAGE = `Usage: goat-proxy <command>
 
 Commands:
-  start     Ensure the persistent local ChatGPT<->Anthropic proxy daemon is running
-  stop      Stop the background proxy daemon (and unload LaunchAgent if present)
-  restart   Restart the background proxy daemon with latest environment
-  status    Show daemon status, port, PID, and LaunchAgent path
-  serve     Run the proxy in the foreground (used by LaunchAgent / systemd)
-  logs      Print the proxy log file path
+  start                    Ensure the persistent local ChatGPT<->Anthropic proxy daemon is running
+  stop                     Stop the background proxy daemon (and unload LaunchAgent / systemd)
+  restart                  Restart the background proxy daemon with latest environment
+  status [--json]          Show daemon status, port, PID, and service path
+  monitor [--once] [--json] Live terminal dashboard showing requests, TTFT, cache hits & errors
+  serve                    Run the proxy in the foreground (used by LaunchAgent / systemd)
+  logs                     Print the proxy log file path
 `;
 
 export async function runProxyCli(argv = process.argv.slice(2), deps = {}) {
@@ -84,12 +86,30 @@ export async function runProxyCli(argv = process.argv.slice(2), deps = {}) {
     } else {
       out.write(`Proxy Running : ${status.running ? `yes (pid ${status.pid})` : 'no'}\n`);
       out.write(`Listen URL    : ${status.baseUrl || '(not initialized)'}\n`);
-      out.write(
-        `LaunchAgent   : ${status.launchAgentInstalled ? `installed (${status.plistPath})` : 'not installed'}\n`
-      );
+      if (process.platform === 'linux') {
+        out.write(
+          `Systemd Unit  : ${status.systemdUnitInstalled ? `installed (${status.unitPath})` : 'not installed'}\n`
+        );
+      } else {
+        out.write(
+          `LaunchAgent   : ${status.launchAgentInstalled ? `installed (${status.plistPath})` : 'not installed'}\n`
+        );
+      }
       out.write(`Log File      : ${status.logPath}\n`);
     }
     return 0;
+  }
+
+  if (cmd === 'monitor' || cmd === 'top') {
+    const once = argv.includes('--once');
+    const json = argv.includes('--json');
+    return await (deps.runProxyMonitor || runProxyMonitor)({
+      once,
+      json,
+      stdout: out,
+      stderr: errOut,
+      stdin: deps.stdin || process.stdin,
+    });
   }
 
   if (cmd === 'logs') {

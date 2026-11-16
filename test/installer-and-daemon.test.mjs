@@ -14,6 +14,7 @@ import {
 } from '../lib/claude-installer.mjs';
 import {
   buildLaunchAgentPlist,
+  buildSystemdServiceUnit,
   ensureDaemonRunning,
   getDaemonStatus,
   probeProxyHealth,
@@ -43,6 +44,21 @@ test('buildLaunchAgentPlist escapes XML special characters and excludes unset en
   assert.match(plist, /<string>\/tmp\/proxy&quot;log&apos;\.log<\/string>/);
   assert.match(plist, /<key>HTTPS_PROXY<\/key>/);
   assert.doesNotMatch(plist, /EMPTY_VAR/);
+
+  const unit = buildSystemdServiceUnit({
+    nodeBin: '/usr/bin/node',
+    proxyScriptPath: '/opt/goat harness/bin/goat-proxy.mjs',
+    logPath: '/home/tester/.goat-harness/proxy.log',
+    envVars: {
+      HOME: '/home/tester',
+      HTTPS_PROXY: 'http://127.0.0.1:7890?a=100%',
+      EMPTY_VAR: '',
+    },
+  });
+  assert.match(unit, /ExecStart="\/usr\/bin\/node" "\/opt\/goat harness\/bin\/goat-proxy\.mjs" serve/);
+  assert.match(unit, /Restart=always/);
+  assert.match(unit, /Environment="HTTPS_PROXY=http:\/\/127\.0\.0\.1:7890\?a=100%%"/);
+  assert.doesNotMatch(unit, /EMPTY_VAR/);
 });
 
 test('proxy-daemon starts detached daemon on isolated ephemeral port, reports status, and stops cleanly', async () => {
@@ -164,7 +180,10 @@ test('installIntoClaudeCode + syncInstalledClaudeModel + uninstallFromClaudeCode
     assert.equal(patched.env.ANTHROPIC_DEFAULT_HAIKU_MODEL, 'gpt-6-luna');
     assert.equal(patched.env.CLAUDE_CODE_AUTO_MODE_SERVER, '0');
     assert.equal(patched.env.CLAUDE_CODE_DISABLE_FAST_MODE, '1');
+    assert.equal(patched.env.CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK, '1');
+    assert.equal(patched.env.CLAUDE_CODE_SUBAGENT_EFFORT, 'medium');
     assert.equal(patched.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS, '272000');
+    assert.equal(patched.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW, String(Math.floor(272000 * 0.88)));
     assert.match(patched.env.NO_PROXY, /127\.0\.0\.1/);
 
     // Verify symlinked skill vs skipped pre-existing user skill directory
@@ -185,6 +204,7 @@ test('installIntoClaudeCode + syncInstalledClaudeModel + uninstallFromClaudeCode
     assert.equal(afterSet.effortLevel, 'xhigh');
     assert.equal(afterSet.env.ANTHROPIC_MODEL, 'gpt-6.1-sol');
     assert.equal(afterSet.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS, '500000');
+    assert.equal(afterSet.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW, String(Math.floor(500000 * 0.88)));
 
     const status = await getClaudeInstallStatus({
       homeDir,

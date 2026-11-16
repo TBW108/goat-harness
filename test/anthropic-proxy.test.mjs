@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { startAnthropicProxy } from '../lib/anthropic-proxy.mjs';
 import { parseSseStream } from '../lib/openai-responses.mjs';
+import { formatMonitorScreen, runProxyMonitor } from '../lib/proxy-monitor.mjs';
 import { getUsageSummary, recordUsageEvent, resetUsageStats, saveSettings } from '../lib/store.mjs';
 
 function sseStreamFromEvents(events) {
@@ -374,6 +375,113 @@ test('anthropic-proxy defaults omitted stream to JSON, caps base64 count_tokens 
     const ctxJson = await ctxRes.json();
     assert.equal(ctxJson.error.type, 'invalid_request_error');
     assert.match(ctxJson.error.message, /^prompt is too long:/);
+  } finally {
+    await proxy.close();
+    delete process.env.GOAT_HARNESS_HOME;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('anthropic-proxy exposes auth-protected telemetry snapshot and monitor formatter renders live metrics', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'goat-proxy-monitor-test-'));
+  process.env.GOAT_HARNESS_HOME = dir;
+
+  let callCount = 0;
+  const proxy = await startAnthropicProxy({
+    defaultModel: 'gpt-6.1-sol',
+    modelTiers: {
+      default: 'gpt-6.1-sol',
+      opus: 'gpt-6-astra',
+      sonnet: 'gpt-6.1-sol',
+      haiku: 'gpt-6-luna',
+    },
+    reasoningEffort: 'xhigh',
+    getTokenFn: async () => ({ token: 'tok', mode: 'oauth', account: {} }),
+    fetchImpl: async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return new Response(
+          JSON.stringify({ error: { message: 'Unsupported parameter: max_output_tokens' } }),
+          { status: 400, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      return sseStreamFromEvents([
+        {
+          type: 'response.output_item.done',
+          item: {
+            id: 'ws_m1',
+            type: 'web_search_call',
+            status: 'completed',
+            action: { type: 'search', query: 'node test' },
+          },
+        },
+        { type: 'response.output_text.delta', delta: 'Monitor ok' },
+        {
+          type: 'response.completed',
+          response: {
+            usage: {
+              input_tokens: 1000,
+              input_tokens_details: { cached_tokens: 800 },
+              output_tokens: 120,
+              output_tokens_details: { reasoning_tokens: 40 },
+              total_tokens: 1120,
+            },
+          },
+        },
+      ]);
+    },
+  });
+
+  try {
+    const unauthSnap = await fetch(`${proxy.baseUrl}/_goat/snapshot`);
+    assert.equal(unauthSnap.status, 401);
+
+    const reqRes = await fetch(`${proxy.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${proxy.token}` },
+      body: JSON.stringify({
+        model: 'haiku',
+        max_tokens: 1024,
+        stream: true,
+        messages: [{ role: 'user', content: 'Quick check' }],
+      }),
+    });
+    assert.equal(reqRes.status, 200);
+    await reqRes.text();
+
+    const snap = proxy.getMonitorSnapshot();
+    assert.equal(snap.stats.totalRequests, 1);
+    assert.equal(snap.stats.activeRequests, 0);
+    assert.equal(snap.stats.completedRequests, 1);
+    assert.equal(snap.stats.fallbackRecoveredRequests, 1);
+    assert.equal(snap.stats.webSearchCalls, 1);
+    assert.equal(snap.stats.cacheHitPct, 80);
+    assert.equal(snap.recent[0].targetModel, 'gpt-6-luna');
+    assert.equal(snap.recent[0].effort, 'low');
+    assert.equal(snap.recent[0].fastTier, true);
+
+    const rendered = formatMonitorScreen(snap, {
+      baseUrl: proxy.baseUrl,
+      account: 'user@example.com',
+      defaultModel: 'gpt-6.1-sol',
+      reasoningEffort: 'xhigh',
+    });
+    assert.match(rendered, /GOAT Proxy Monitor/);
+    assert.match(rendered, /gpt-6-luna/);
+    assert.match(rendered, /low\*/);
+    assert.match(rendered, /1 auto-400-fixed/);
+
+    let out = '';
+    const monitorCode = await runProxyMonitor({
+      once: true,
+      json: true,
+      baseUrl: proxy.baseUrl,
+      token: proxy.token,
+      stdout: { write: (s) => (out += s) },
+      stderr: { write: () => {} },
+    });
+    assert.equal(monitorCode, 0);
+    assert.equal(JSON.parse(out).stats.completedRequests, 1);
   } finally {
     await proxy.close();
     delete process.env.GOAT_HARNESS_HOME;

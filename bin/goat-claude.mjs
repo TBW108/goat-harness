@@ -29,6 +29,7 @@ import {
   saveSettings,
   VALID_REASONING_EFFORTS,
 } from '../lib/store.mjs';
+import { runProxyMonitor } from '../lib/proxy-monitor.mjs';
 import { runProxyCli } from './goat-proxy.mjs';
 
 const CLAUDE_CLI_EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
@@ -38,7 +39,9 @@ const HELP_TEXT = `Usage:
   goat-claude install [--model <slug>] [--effort <level>] [--no-browser] [--no-link] [--json]
   goat-claude uninstall [--purge] [--unlink] [--json]
   goat-claude status [--json]
-  goat-claude proxy <start|stop|restart|status|serve|logs>
+  goat-claude usage [--json]
+  goat-claude top [--once] [--json]
+  goat-claude proxy <start|stop|restart|status|monitor|serve|logs>
 
 Launches interactive Claude Code backed by your OpenAI ChatGPT subscription
 via GOAT Harness's local Anthropic-to-OpenAI proxy (no Anthropic /login needed).
@@ -50,6 +53,8 @@ Subcommands:
   uninstall            Stop persistent proxy daemon and restore ~/.claude/settings.json
                        to its exact pre-install configuration (--purge removes ~/.goat-harness)
   status               Show global installation, daemon health, auth, model, and usage status
+  usage                Show local token usage stats and ChatGPT quota settings link
+  top | monitor        Open live terminal dashboard for active proxy requests, TTFT & cache hits
   proxy <cmd>          Manage the persistent loopback proxy daemon
 
 GOAT options:
@@ -269,6 +274,26 @@ export async function runGoatClaude(argv = process.argv.slice(2), deps = {}) {
   const subcommand = String(argv[0] || '').trim();
   if (subcommand === 'proxy') {
     return runProxyCliFn(argv.slice(1), deps);
+  }
+  if (subcommand === 'top' || subcommand === 'monitor') {
+    const rest = argv.slice(1);
+    return await (deps.runProxyMonitor || runProxyMonitor)({
+      once: rest.includes('--once'),
+      json: rest.includes('--json'),
+      stdout: out,
+      stderr: errOut,
+      stdin: deps.stdin || process.stdin,
+    });
+  }
+  if (subcommand === 'usage') {
+    const flags = parseSubcommandFlags(argv.slice(1));
+    const usage = getUsageSummaryFn();
+    if (flags.json) {
+      out.write(`${JSON.stringify(usage, null, 2)}\n`);
+    } else {
+      out.write(formatUsageReport(usage));
+    }
+    return 0;
   }
 
   if (subcommand === 'install') {
@@ -538,6 +563,7 @@ export async function runGoatClaude(argv = process.argv.slice(2), deps = {}) {
   });
 
   const contextWindow = Number(launchConfig.contextWindow || 0);
+  const autoCompactWindow = contextWindow >= 64_000 ? Math.floor(contextWindow * 0.88) : 0;
   const childEnv = ensureLoopbackNoProxy({
     ...(deps.baseEnv || process.env),
     ANTHROPIC_BASE_URL: proxy.baseUrl,
@@ -549,7 +575,10 @@ export async function runGoatClaude(argv = process.argv.slice(2), deps = {}) {
     ANTHROPIC_DEFAULT_HAIKU_MODEL: tiers.haiku || selectedModel,
     CLAUDE_CODE_AUTO_MODE_SERVER: '0',
     CLAUDE_CODE_DISABLE_FAST_MODE: '1',
+    CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK: '1',
+    CLAUDE_CODE_SUBAGENT_EFFORT: 'medium',
     ...(contextWindow > 0 ? { CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(contextWindow) } : {}),
+    ...(autoCompactWindow > 0 ? { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(autoCompactWindow) } : {}),
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
   });
   // Setting ANTHROPIC_API_KEY triggers an interactive confirmation prompt in Claude Code;

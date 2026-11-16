@@ -17,8 +17,40 @@
     "usage": "node bin/goat-login.mjs usage",
     "claude": "node bin/goat-claude.mjs",
     "status": "node bin/goat-claude.mjs status",
+    "monitor": "node bin/goat-proxy.mjs monitor",
     "install:claude": "bash scripts/install-claude.sh",
     "uninstall:claude": "bash scripts/uninstall-claude.sh"
+  },
+  "files": [
+    "assets/",
+    "bin/",
+    "claude-plugin/",
+    "lib/",
+    "scripts/",
+    "rules/",
+    "skills/",
+    "sidecars/",
+    "hooks.json",
+    "mcp_config.json",
+    "plugin.json",
+    "README.md"
+  ],
+  "keywords": [
+    "claude-code",
+    "chatgpt",
+    "openai",
+    "codex",
+    "oauth",
+    "anthropic-proxy",
+    "responses-api"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TBW108/goat-harness.git"
+  },
+  "homepage": "https://github.com/TBW108/goat-harness#readme",
+  "bugs": {
+    "url": "https://github.com/TBW108/goat-harness/issues"
   },
   "engines": {
     "node": ">=22.0.0"

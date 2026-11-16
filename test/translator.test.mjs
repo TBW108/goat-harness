@@ -660,3 +660,45 @@ test('callOpenAIResponsesStream recovers from 400 rejecting reasoning effort non
   assert.equal(seenBodies[0].reasoning.effort, 'none');
   assert.notEqual(seenBodies[1].reasoning?.effort, 'none');
 });
+
+test('resolveTargetModel strips [1m] context suffix and buildResponsesPayload accelerates fast-tier & utility calls', () => {
+  const tiers = {
+    default: 'gpt-6.1-sol',
+    opus: 'gpt-6-astra',
+    sonnet: 'gpt-6.1-sol',
+    haiku: 'gpt-6-luna',
+  };
+
+  assert.equal(resolveTargetModel('gpt-6-astra[1m]', tiers), 'gpt-6-astra');
+  assert.equal(resolveTargetModel('claude-opus-4-6[1m]', tiers), 'gpt-6-astra');
+  assert.equal(resolveTargetModel('claude-haiku-4-5[1m]', tiers), 'gpt-6-luna');
+
+  // Main session keeps xhigh
+  const mainReq = buildResponsesPayload(
+    { model: 'gpt-6.1-sol', max_tokens: 4096, messages: [{ role: 'user', content: 'Refactor module' }] },
+    { modelTiers: tiers, reasoningEffort: 'xhigh', effortPinned: true }
+  );
+  assert.deepEqual(mainReq.reasoning, { effort: 'xhigh' });
+
+  // Haiku / fast subagent tier without explicit output_config.effort accelerates to low
+  const fastTierReq = buildResponsesPayload(
+    { model: 'gpt-6-luna', max_tokens: 4096, messages: [{ role: 'user', content: 'Summarize files' }] },
+    { modelTiers: tiers, reasoningEffort: 'xhigh', effortPinned: true }
+  );
+  assert.equal(fastTierReq.model, 'gpt-6-luna');
+  assert.deepEqual(fastTierReq.reasoning, { effort: 'low' });
+
+  // Short non-tool utility call (e.g., conversation title generator) accelerates to low
+  const utilityReq = buildResponsesPayload(
+    { model: 'gpt-6.1-sol', max_tokens: 256, messages: [{ role: 'user', content: 'Generate short title' }] },
+    { modelTiers: tiers, reasoningEffort: 'xhigh', effortPinned: true }
+  );
+  assert.deepEqual(utilityReq.reasoning, { effort: 'low' });
+
+  // If primary default model IS gpt-6-luna, direct gpt-6-luna coding calls still honor user effort
+  const directLunaDefault = buildResponsesPayload(
+    { model: 'gpt-6-luna', max_tokens: 4096, messages: [{ role: 'user', content: 'Implement feature' }] },
+    { modelTiers: { ...tiers, default: 'gpt-6-luna' }, reasoningEffort: 'high', effortPinned: true }
+  );
+  assert.deepEqual(directLunaDefault.reasoning, { effort: 'high' });
+});
